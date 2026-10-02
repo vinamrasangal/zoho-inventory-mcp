@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "zoho-inventory-mock": {
+      "command": "/absolute/path/to/zoho-inventory-mcp/.venv/bin/zoho-inventory-mcp",
+      "args": ["serve"],
+      "env": {
+        "ZOHO_CLIENT_ID": "mock-client-id",
+        "ZOHO_CLIENT_SECRET": "mock-client-secret",
+        "ZOHO_ACCOUNTS_URL": "http://127.0.0.1:8800",
+        "ZOHO_REFRESH_TOKEN": "mock-refresh-token",
+        "ZOHO_ORGANIZATION_ID": "60012345678",
+        "ZOHO_TOKEN_STORE_PATH": "/tmp/zoho-inventory-mcp-mock/tokens.json"
+      }
+    }
+  }
+}

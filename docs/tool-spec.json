@@ -1,0 +1,2432 @@
+{
+  "name": "zoho-inventory",
+  "version": "0.1.0",
+  "instructions": "Read-only access to one merchant's Zoho Inventory organization: items and stock levels,\nsales orders, and customers. Nothing here can create, change or delete data.\n\nHow to use these tools well:\n- Prefer search_* tools over paging through list_* results. Each call costs the merchant API quota.\n- To look up an order or item the user names, search first, then call get_* with the returned ID\n  (or pass the SKU / order number directly to get_item / get_sales_order).\n- Stock: available_stock already subtracts quantities committed to open orders; use it to answer\n  \"can we fulfil this?\". stock_on_hand is the physical count.\n- Amounts are in the organization's currency (see currency_code). Dates are YYYY-MM-DD.\n- If a tool returns an error, read its \"Next step\" hint. Do not retry auth or quota errors.\n",
+  "tools": [
+    {
+      "name": "connection_status",
+      "title": "Connection status",
+      "description": "Check that Zoho Inventory is connected and show the organization, token expiry and remaining\nrate-limit budget. Call this first if other tools fail with auth or configuration errors.",
+      "inputSchema": {
+        "properties": {},
+        "title": "connection_statusArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "properties": {
+          "connected": {
+            "title": "Connected",
+            "type": "boolean"
+          },
+          "organization_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Organization Id"
+          },
+          "organization_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Organization Name"
+          },
+          "api_domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Api Domain"
+          },
+          "access_token_expires_in_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Access Token Expires In Seconds"
+          },
+          "granted_scopes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Granted Scopes"
+          },
+          "rate_limits": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Rate Limits",
+            "type": "object"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Message"
+          }
+        },
+        "required": [
+          "connected"
+        ],
+        "title": "ConnectionStatus",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "list_items",
+      "title": "List items",
+      "description": "Browse the product catalogue page by page with price and stock levels.\nUse search_items instead when looking for something specific.",
+      "inputSchema": {
+        "properties": {
+          "status": {
+            "default": "active",
+            "description": "Filter by item status.",
+            "enum": [
+              "active",
+              "inactive",
+              "all"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "sort_by": {
+            "default": "name",
+            "description": "Sort column.",
+            "enum": [
+              "name",
+              "sku",
+              "rate",
+              "stock_on_hand"
+            ],
+            "title": "Sort By",
+            "type": "string"
+          },
+          "page": {
+            "default": 1,
+            "description": "1-based page number.",
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "maximum": 200,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Results per page (default 25, max 100).",
+            "title": "Per Page"
+          }
+        },
+        "title": "list_itemsArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "ItemSummary": {
+            "properties": {
+              "item_id": {
+                "title": "Item Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sku"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              },
+              "rate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Selling price per unit.",
+                "title": "Rate"
+              },
+              "stock_on_hand": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Physical stock across warehouses.",
+                "title": "Stock On Hand"
+              },
+              "available_stock": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Stock on hand minus quantities committed to open orders.",
+                "title": "Available Stock"
+              },
+              "reorder_level": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reorder Level"
+              },
+              "is_low_stock": {
+                "description": "available_stock is at or below a non-zero reorder_level.",
+                "title": "Is Low Stock",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "item_id",
+              "name",
+              "is_low_stock"
+            ],
+            "title": "ItemSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/ItemSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "title": "Per Page",
+            "type": "integer"
+          },
+          "has_more": {
+            "description": "True if another page exists; call again with page=next_page.",
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Page"
+          }
+        },
+        "required": [
+          "results",
+          "page",
+          "per_page",
+          "has_more"
+        ],
+        "title": "ItemPage",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "search_items",
+      "title": "Search items",
+      "description": "Find items by name, SKU or description. Returns price, stock on hand, available stock and\na low-stock flag for each match.",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "description": "Text matched against item name, SKU and description, e.g. 'masala chai'.",
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "status": {
+            "default": "active",
+            "description": "Filter by item status.",
+            "enum": [
+              "active",
+              "inactive",
+              "all"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "page": {
+            "default": 1,
+            "description": "1-based page number.",
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "maximum": 200,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Results per page (default 25, max 100).",
+            "title": "Per Page"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_itemsArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "ItemSummary": {
+            "properties": {
+              "item_id": {
+                "title": "Item Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sku"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              },
+              "rate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Selling price per unit.",
+                "title": "Rate"
+              },
+              "stock_on_hand": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Physical stock across warehouses.",
+                "title": "Stock On Hand"
+              },
+              "available_stock": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Stock on hand minus quantities committed to open orders.",
+                "title": "Available Stock"
+              },
+              "reorder_level": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reorder Level"
+              },
+              "is_low_stock": {
+                "description": "available_stock is at or below a non-zero reorder_level.",
+                "title": "Is Low Stock",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "item_id",
+              "name",
+              "is_low_stock"
+            ],
+            "title": "ItemSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/ItemSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "title": "Per Page",
+            "type": "integer"
+          },
+          "has_more": {
+            "description": "True if another page exists; call again with page=next_page.",
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Page"
+          }
+        },
+        "required": [
+          "results",
+          "page",
+          "per_page",
+          "has_more"
+        ],
+        "title": "ItemPage",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_item",
+      "title": "Get item",
+      "description": "Get one item's full details including per-warehouse stock. Pass exactly one of item_id or sku.",
+      "inputSchema": {
+        "properties": {
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Zoho item_id from a list/search result.",
+            "title": "Item Id"
+          },
+          "sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact SKU, e.g. 'TEA-ASM-250'.",
+            "title": "Sku"
+          }
+        },
+        "title": "get_itemArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "WarehouseStock": {
+            "properties": {
+              "warehouse_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Warehouse Id"
+              },
+              "warehouse_name": {
+                "title": "Warehouse Name",
+                "type": "string"
+              },
+              "stock_on_hand": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Stock On Hand"
+              },
+              "available_stock": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Available Stock"
+              }
+            },
+            "required": [
+              "warehouse_name"
+            ],
+            "title": "WarehouseStock",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "sku": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sku"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unit"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Selling price per unit.",
+            "title": "Rate"
+          },
+          "stock_on_hand": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Physical stock across warehouses.",
+            "title": "Stock On Hand"
+          },
+          "available_stock": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Stock on hand minus quantities committed to open orders.",
+            "title": "Available Stock"
+          },
+          "reorder_level": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reorder Level"
+          },
+          "is_low_stock": {
+            "description": "available_stock is at or below a non-zero reorder_level.",
+            "title": "Is Low Stock",
+            "type": "boolean"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "purchase_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Purchase Rate"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "brand": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Brand"
+          },
+          "hsn_or_sac": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Hsn Or Sac"
+          },
+          "warehouses": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/WarehouseStock"
+            },
+            "title": "Warehouses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "item_id",
+          "name",
+          "is_low_stock"
+        ],
+        "title": "ItemDetail",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_low_stock_items",
+      "title": "Low-stock items",
+      "description": "List active items whose available stock is at or below their reorder level, most urgent first.\nUse this for 'what do I need to reorder?' questions. Scans the catalogue, so call it once and reuse\nthe result rather than calling it repeatedly.",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "default": 50,
+            "description": "Maximum items to return.",
+            "maximum": 200,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "get_low_stock_itemsArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "ItemSummary": {
+            "properties": {
+              "item_id": {
+                "title": "Item Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sku"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "unit": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Unit"
+              },
+              "rate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Selling price per unit.",
+                "title": "Rate"
+              },
+              "stock_on_hand": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Physical stock across warehouses.",
+                "title": "Stock On Hand"
+              },
+              "available_stock": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Stock on hand minus quantities committed to open orders.",
+                "title": "Available Stock"
+              },
+              "reorder_level": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reorder Level"
+              },
+              "is_low_stock": {
+                "description": "available_stock is at or below a non-zero reorder_level.",
+                "title": "Is Low Stock",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "item_id",
+              "name",
+              "is_low_stock"
+            ],
+            "title": "ItemSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "items": {
+            "description": "Low-stock items, most urgent (largest shortfall) first.",
+            "items": {
+              "$ref": "#/$defs/ItemSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "scanned_items": {
+            "title": "Scanned Items",
+            "type": "integer"
+          },
+          "truncated": {
+            "description": "True if the catalogue was larger than the scan limit.",
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "scanned_items",
+          "truncated"
+        ],
+        "title": "LowStockReport",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "list_sales_orders",
+      "title": "List sales orders",
+      "description": "List sales orders, newest first, optionally filtered by status, customer and date range.",
+      "inputSchema": {
+        "properties": {
+          "status": {
+            "default": "all",
+            "description": "Filter by order status.",
+            "enum": [
+              "all",
+              "draft",
+              "confirmed",
+              "closed",
+              "void",
+              "onhold"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Only this customer's orders (customer_id from search_customers).",
+            "title": "Customer Id"
+          },
+          "date_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order date on/after, YYYY-MM-DD.",
+            "title": "Date From"
+          },
+          "date_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order date on/before, YYYY-MM-DD.",
+            "title": "Date To"
+          },
+          "page": {
+            "default": 1,
+            "description": "1-based page number.",
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "maximum": 200,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Results per page (default 25, max 100).",
+            "title": "Per Page"
+          }
+        },
+        "title": "list_sales_ordersArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "SalesOrderSummary": {
+            "properties": {
+              "salesorder_id": {
+                "title": "Salesorder Id",
+                "type": "string"
+              },
+              "salesorder_number": {
+                "title": "Salesorder Number",
+                "type": "string"
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Date"
+              },
+              "shipment_date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Shipment Date"
+              },
+              "reference_number": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reference Number"
+              },
+              "customer_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Customer Id"
+              },
+              "customer_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Customer Name"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "invoiced_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Invoiced Status"
+              },
+              "paid_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Paid Status"
+              },
+              "shipped_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Shipped Status"
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Total"
+              },
+              "currency_code": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Currency Code"
+              }
+            },
+            "required": [
+              "salesorder_id",
+              "salesorder_number"
+            ],
+            "title": "SalesOrderSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/SalesOrderSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "title": "Per Page",
+            "type": "integer"
+          },
+          "has_more": {
+            "description": "True if another page exists; call again with page=next_page.",
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Page"
+          }
+        },
+        "required": [
+          "results",
+          "page",
+          "per_page",
+          "has_more"
+        ],
+        "title": "SalesOrderPage",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "search_sales_orders",
+      "title": "Search sales orders",
+      "description": "Find sales orders by order number, reference number or customer name.",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "description": "Order number, reference number or customer name, e.g. 'SO-00042'.",
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "status": {
+            "default": "all",
+            "description": "Filter by order status.",
+            "enum": [
+              "all",
+              "draft",
+              "confirmed",
+              "closed",
+              "void",
+              "onhold"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "page": {
+            "default": 1,
+            "description": "1-based page number.",
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "maximum": 200,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Results per page (default 25, max 100).",
+            "title": "Per Page"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_sales_ordersArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "SalesOrderSummary": {
+            "properties": {
+              "salesorder_id": {
+                "title": "Salesorder Id",
+                "type": "string"
+              },
+              "salesorder_number": {
+                "title": "Salesorder Number",
+                "type": "string"
+              },
+              "date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Date"
+              },
+              "shipment_date": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Shipment Date"
+              },
+              "reference_number": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Reference Number"
+              },
+              "customer_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Customer Id"
+              },
+              "customer_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Customer Name"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "invoiced_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Invoiced Status"
+              },
+              "paid_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Paid Status"
+              },
+              "shipped_status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Shipped Status"
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Total"
+              },
+              "currency_code": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Currency Code"
+              }
+            },
+            "required": [
+              "salesorder_id",
+              "salesorder_number"
+            ],
+            "title": "SalesOrderSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/SalesOrderSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "title": "Per Page",
+            "type": "integer"
+          },
+          "has_more": {
+            "description": "True if another page exists; call again with page=next_page.",
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Page"
+          }
+        },
+        "required": [
+          "results",
+          "page",
+          "per_page",
+          "has_more"
+        ],
+        "title": "SalesOrderPage",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_sales_order",
+      "title": "Get sales order",
+      "description": "Get one sales order with line items, totals, and invoicing/payment/shipping status.\nPass exactly one of salesorder_id or salesorder_number.",
+      "inputSchema": {
+        "properties": {
+          "salesorder_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Zoho salesorder_id.",
+            "title": "Salesorder Id"
+          },
+          "salesorder_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order number, e.g. 'SO-00042'.",
+            "title": "Salesorder Number"
+          }
+        },
+        "title": "get_sales_orderArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "LineItem": {
+            "properties": {
+              "item_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Item Id"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "sku": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Sku"
+              },
+              "quantity": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Quantity"
+              },
+              "rate": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Rate"
+              },
+              "total": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Total"
+              },
+              "quantity_shipped": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Quantity Shipped"
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "title": "LineItem",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "salesorder_id": {
+            "title": "Salesorder Id",
+            "type": "string"
+          },
+          "salesorder_number": {
+            "title": "Salesorder Number",
+            "type": "string"
+          },
+          "date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Date"
+          },
+          "shipment_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Shipment Date"
+          },
+          "reference_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reference Number"
+          },
+          "customer_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Id"
+          },
+          "customer_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Customer Name"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "invoiced_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Invoiced Status"
+          },
+          "paid_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Paid Status"
+          },
+          "shipped_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Shipped Status"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "currency_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Currency Code"
+          },
+          "line_items": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/LineItem"
+            },
+            "title": "Line Items",
+            "type": "array"
+          },
+          "sub_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Sub Total"
+          },
+          "tax_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Tax Total"
+          },
+          "shipping_charge": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Shipping Charge"
+          },
+          "delivery_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Delivery Method"
+          },
+          "salesperson_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Salesperson Name"
+          },
+          "shipping_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Shipping Address"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes"
+          }
+        },
+        "required": [
+          "salesorder_id",
+          "salesorder_number"
+        ],
+        "title": "SalesOrderDetail",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "list_customers",
+      "title": "List customers",
+      "description": "Browse active customers page by page. Use search_customers to find a specific one.",
+      "inputSchema": {
+        "properties": {
+          "page": {
+            "default": 1,
+            "description": "1-based page number.",
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "maximum": 200,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Results per page (default 25, max 100).",
+            "title": "Per Page"
+          }
+        },
+        "title": "list_customersArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "CustomerSummary": {
+            "properties": {
+              "customer_id": {
+                "title": "Customer Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "company_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Company Name"
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Email"
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Phone"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "outstanding_receivable": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Unpaid invoice amount.",
+                "title": "Outstanding Receivable"
+              },
+              "currency_code": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Currency Code"
+              }
+            },
+            "required": [
+              "customer_id",
+              "name"
+            ],
+            "title": "CustomerSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/CustomerSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "title": "Per Page",
+            "type": "integer"
+          },
+          "has_more": {
+            "description": "True if another page exists; call again with page=next_page.",
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Page"
+          }
+        },
+        "required": [
+          "results",
+          "page",
+          "per_page",
+          "has_more"
+        ],
+        "title": "CustomerPage",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "search_customers",
+      "title": "Search customers",
+      "description": "Find customers by name, company, email or phone. Returns customer_id for use with\nget_customer and list_sales_orders.",
+      "inputSchema": {
+        "properties": {
+          "query": {
+            "description": "Name, company, email or phone fragment.",
+            "minLength": 1,
+            "title": "Query",
+            "type": "string"
+          },
+          "page": {
+            "default": 1,
+            "description": "1-based page number.",
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "anyOf": [
+              {
+                "maximum": 200,
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Results per page (default 25, max 100).",
+            "title": "Per Page"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "title": "search_customersArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "$defs": {
+          "CustomerSummary": {
+            "properties": {
+              "customer_id": {
+                "title": "Customer Id",
+                "type": "string"
+              },
+              "name": {
+                "title": "Name",
+                "type": "string"
+              },
+              "company_name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Company Name"
+              },
+              "email": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Email"
+              },
+              "phone": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Phone"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "outstanding_receivable": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Unpaid invoice amount.",
+                "title": "Outstanding Receivable"
+              },
+              "currency_code": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Currency Code"
+              }
+            },
+            "required": [
+              "customer_id",
+              "name"
+            ],
+            "title": "CustomerSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/$defs/CustomerSummary"
+            },
+            "title": "Results",
+            "type": "array"
+          },
+          "page": {
+            "title": "Page",
+            "type": "integer"
+          },
+          "per_page": {
+            "title": "Per Page",
+            "type": "integer"
+          },
+          "has_more": {
+            "description": "True if another page exists; call again with page=next_page.",
+            "title": "Has More",
+            "type": "boolean"
+          },
+          "next_page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Next Page"
+          }
+        },
+        "required": [
+          "results",
+          "page",
+          "per_page",
+          "has_more"
+        ],
+        "title": "CustomerPage",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    },
+    {
+      "name": "get_customer",
+      "title": "Get customer",
+      "description": "Get a customer's contact details, addresses, GSTIN and outstanding receivable.",
+      "inputSchema": {
+        "properties": {
+          "customer_id": {
+            "description": "customer_id from search_customers.",
+            "minLength": 1,
+            "title": "Customer Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_id"
+        ],
+        "title": "get_customerArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "properties": {
+          "customer_id": {
+            "title": "Customer Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "company_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Company Name"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Email"
+          },
+          "phone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Phone"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "outstanding_receivable": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Unpaid invoice amount.",
+            "title": "Outstanding Receivable"
+          },
+          "currency_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Currency Code"
+          },
+          "billing_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Billing Address"
+          },
+          "shipping_address": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Shipping Address"
+          },
+          "gst_no": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Gst No"
+          },
+          "created_time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Created Time"
+          }
+        },
+        "required": [
+          "customer_id",
+          "name"
+        ],
+        "title": "CustomerDetail",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": true
+      }
+    }
+  ]
+}

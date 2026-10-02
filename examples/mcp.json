@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "zoho-inventory": {
+      "command": "/absolute/path/to/zoho-inventory-mcp/.venv/bin/zoho-inventory-mcp",
+      "args": ["serve"],
+      "env": {
+        "ZOHO_CLIENT_ID": "your-client-id",
+        "ZOHO_CLIENT_SECRET": "your-client-secret",
+        "ZOHO_DATA_CENTER": "in",
+        "ZOHO_ORGANIZATION_ID": "your-organization-id"
+      }
+    }
+  }
+}
