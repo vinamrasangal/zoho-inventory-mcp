@@ -1,0 +1,60 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zoho-inventory-mcp"
+version = "0.1.0"
+description = "A private, read-only MCP connector that lets AI agents look up Zoho Inventory items, stock, sales orders and customers."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [{ name = "Vinamra Sangal" }]
+keywords = ["mcp", "zoho", "zoho-inventory", "ai-agents", "connector", "oauth"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Framework :: AsyncIO",
+    "Topic :: Software Development :: Libraries",
+]
+dependencies = [
+    "mcp>=2.2,<3",
+    "httpx>=0.27",
+    "pydantic>=2.12",
+    "pydantic-settings>=2.3",
+    "starlette>=0.48",
+    "uvicorn>=0.31",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+zoho-inventory-mcp = "zoho_inventory_mcp.cli:main"
+zoho-mock-server = "mock_zoho.__main__:main"
+
+[project.urls]
+Repository = "https://github.com/vinamrasangal/zoho-inventory-mcp"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zoho_inventory_mcp", "src/mock_zoho"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 110
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "SIM", "RUF"]
+ignore = ["RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["E501", "RUF001", "ASYNC210"]
